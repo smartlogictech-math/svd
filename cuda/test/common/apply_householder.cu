@@ -5,8 +5,7 @@ void apply_householder(
     cuDoubleComplex tau,
     const cuDoubleComplex* v,
     const cuDoubleComplex* y,
-    cuDoubleComplex* Hy,
-    householder_side_t side
+    cuDoubleComplex* Hy
 )
 {
     cuDoubleComplex dot = make_cuDoubleComplex(0.0, 0.0);
@@ -15,10 +14,7 @@ void apply_householder(
         dot = cuCadd(dot, cuCmul(cuConj(v[i]), y[i]));
     }
 
-    cuDoubleComplex alpha =
-        (side == HOUSEHOLDER_LEFT) ? cuConj(tau) : tau;
-
     for (int i = 0; i < n; ++i) {
-        Hy[i] = cuCsub(y[i], cuCmul(alpha, cuCmul(v[i], dot)));
+        Hy[i] = cuCsub(y[i], cuCmul(tau, cuCmul(v[i], dot)));
     }
 }
