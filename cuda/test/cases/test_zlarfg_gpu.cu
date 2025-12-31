@@ -8,10 +8,10 @@ static void check(const int n, const cuDoubleComplex *y, const cuDoubleComplex b
     // 1. check beta
     printf("imag(beta) = %.3e\n",cuCimag(beta));
     assert(cuCimag(beta) == 0.0);
-    
+
     // 2.  H**H * ( y ) = ( beta 0)
     cuDoubleComplex* Hy = (cuDoubleComplex*)malloc(n * sizeof(cuDoubleComplex));
-    apply_householder(n, tau, v, y, Hy, HOUSEHOLDER_LEFT);
+    apply_householder(n, cuConj(tau), v, y, Hy);
     // target = [beta, 0, 0, ...]
     cuDoubleComplex* target =(cuDoubleComplex*)calloc(n, sizeof(cuDoubleComplex));
     target[0] = beta;
@@ -27,7 +27,7 @@ static void check(const int n, const cuDoubleComplex *y, const cuDoubleComplex b
     
     /// 3. H * H**H * y = y
     cuDoubleComplex *HHy = (cuDoubleComplex*)malloc(n * sizeof(cuDoubleComplex));
-    apply_householder(n, tau, v, Hy, HHy, HOUSEHOLDER_RIGHT);
+    apply_householder(n, tau, v, Hy, HHy);
     for (int i = 0; i < n; ++i) {
         res[i] = cuCsub(HHy[i], y[i]);
     }
