@@ -4,6 +4,43 @@
 #include <assert.h>
 #include <stdio.h>
 
+static void check(const int n, const cuDoubleComplex *y, const cuDoubleComplex beta, const cuDoubleComplex tau, const cuDoubleComplex *v){
+    // 1. check beta
+    printf("imag(beta) = %.3e\n",cuCimag(beta));
+    assert(cuCimag(beta) == 0.0);
+    
+    // 2.  H**H * ( y ) = ( beta 0)
+    cuDoubleComplex* Hy = (cuDoubleComplex*)malloc(n * sizeof(cuDoubleComplex));
+    apply_householder(n, tau, v, y, Hy, HOUSEHOLDER_LEFT);
+    // target = [beta, 0, 0, ...]
+    cuDoubleComplex* target =(cuDoubleComplex*)calloc(n, sizeof(cuDoubleComplex));
+    target[0] = beta;
+
+    cuDoubleComplex* res =(cuDoubleComplex*)malloc(n * sizeof(cuDoubleComplex));
+    for (int i = 0; i < n; ++i) {
+        res[i] = Hy[i];
+    }
+    res[0] = cuCsub(res[0], beta);  // Hy[0] - beta
+    double hy_rel_err =znrm2_host(n, res) / znrm2_host(n, y);
+    printf("H**H * y relative error = %.3e\n", hy_rel_err);
+    assert(hy_rel_err < 1e-12);
+    
+    /// 3. H * H**H * y = y
+    cuDoubleComplex *HHy = (cuDoubleComplex*)malloc(n * sizeof(cuDoubleComplex));
+    apply_householder(n, tau, v, Hy, HHy, HOUSEHOLDER_RIGHT);
+    for (int i = 0; i < n; ++i) {
+        res[i] = cuCsub(HHy[i], y[i]);
+    }
+    double hhy_rel_err =znrm2_host(n, res) / znrm2_host(n, y);
+    printf("H * H**H * y relative error = %.3e\n", hhy_rel_err);
+    assert(hhy_rel_err < 1e-12);
+
+    free(Hy);
+    free(target);
+    free(res);
+    free(HHy);
+}
+
 void test_zlarfg_gpu(int n)
 {
     assert(n >= 2);
@@ -11,7 +48,6 @@ void test_zlarfg_gpu(int n)
     // ---------- host data ----------
     cuDoubleComplex* h_y     = (cuDoubleComplex*)malloc(n * sizeof(*h_y));
     cuDoubleComplex* h_y0    = (cuDoubleComplex*)malloc(n * sizeof(*h_y0));
-    cuDoubleComplex* h_Hy    = (cuDoubleComplex*)malloc(n * sizeof(*h_Hy));
     cuDoubleComplex* h_v     = (cuDoubleComplex*)malloc(n * sizeof(*h_v));
 
     // random input
@@ -46,41 +82,12 @@ void test_zlarfg_gpu(int n)
 
     h_v[0] = make_cuDoubleComplex(1.0, 0.0);
 
-    // ---------- checks ----------
-    // check beta real
-    printf("Im(beta) = %.3e\n", fabs(cuCimag(beta)));
-
-    // apply H
-    apply_householder(n, tau, h_v, h_y0, h_Hy);
-
-    // target = [beta, 0, 0, ...]
-    cuDoubleComplex* h_target =
-        (cuDoubleComplex*)calloc(n, sizeof(*h_target));
-    h_target[0] = beta;
-
-    cuDoubleComplex* h_res =
-        (cuDoubleComplex*)malloc(n * sizeof(*h_res));
-
-    for (int i = 0; i < n; ++i) {
-        h_res[i] = h_Hy[i];
-    }
-    h_res[0] = cuCsub(h_res[0], beta);  // Hy[0] - beta
-
-    double rel_err =
-        znrm2_host(n, h_res) / znrm2_host(n, h_y0);
-
-
-    printf("relative error = %.3e\n", rel_err);
-
-    assert(rel_err < 1e-12);
+    check(n, h_y, beta, tau, h_v);
 
     // ---------- cleanup ----------
     free(h_y);
     free(h_y0);
-    free(h_Hy);
     free(h_v);
-    free(h_target);
-    free(h_res);
 
     cudaFree(d_alpha);
     cudaFree(d_x);
@@ -90,7 +97,7 @@ void test_zlarfg_gpu(int n)
 
 int main()
 {
-    test_zlarfg_gpu(2);
+    test_zlarfg_gpu(65535);
     printf("All zlarfg_gpu tests passed.\n");
     return 0;
 }
