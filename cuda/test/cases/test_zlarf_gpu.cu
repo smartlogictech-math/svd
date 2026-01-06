@@ -1,5 +1,5 @@
 #include "cuSVD.cuh"
-#include "../common/common.cuh"
+#include "../common/host.cuh"
 
 #include <assert.h>
 #include <stdio.h>

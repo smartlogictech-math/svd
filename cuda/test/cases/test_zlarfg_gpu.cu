@@ -1,5 +1,5 @@
 #include "cuSVD.cuh"
-#include "../common/common.cuh"
+#include "../common/host.cuh"
 
 #include <assert.h>
 #include <stdio.h>
@@ -11,7 +11,7 @@ static void check(const int n, const cuDoubleComplex *y, const cuDoubleComplex b
 
     // 2.  H**H * ( y ) = ( beta 0)
     cuDoubleComplex* Hy = (cuDoubleComplex*)malloc(n * sizeof(cuDoubleComplex));
-    apply_householder(n, cuConj(tau), v, y, Hy);
+    zlarfv_host(n, cuConj(tau), v, y, Hy);
     // target = [beta, 0, 0, ...]
     cuDoubleComplex* target =(cuDoubleComplex*)calloc(n, sizeof(cuDoubleComplex));
     target[0] = beta;
@@ -27,7 +27,7 @@ static void check(const int n, const cuDoubleComplex *y, const cuDoubleComplex b
     
     /// 3. H * H**H * y = y
     cuDoubleComplex *HHy = (cuDoubleComplex*)malloc(n * sizeof(cuDoubleComplex));
-    apply_householder(n, tau, v, Hy, HHy);
+    zlarfv_host(n, tau, v, Hy, HHy);
     for (int i = 0; i < n; ++i) {
         res[i] = cuCsub(HHy[i], y[i]);
     }
