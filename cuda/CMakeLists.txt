@@ -24,9 +24,24 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/test/common
 )
 
-# =========================
+# ============================================================
+# 0️⃣ BLAS 扩展库：src_blasEx → libcuBlasEx
+# ============================================================
+file(GLOB CU_BLASEX_SRC
+    src_blasEx/*.cu
+)
+
+add_library(cuBlasEx STATIC
+    ${CU_BLASEX_SRC}
+)
+
+target_link_libraries(cuBlasEx
+    CUDA::cudart
+)
+
+# ============================================================
 # 1️⃣ 算法库：src → libcuSVD
-# =========================
+# ============================================================
 file(GLOB CU_SVD_SRC
     src/*.cu
 )
@@ -36,13 +51,14 @@ add_library(cuSVD STATIC
 )
 
 target_link_libraries(cuSVD
+    cuBlasEx          # ← 新增依赖
     CUDA::cudart
     CUDA::cublas
 )
 
-# =========================
+# ============================================================
 # 2️⃣ 测试公共代码库：test/common
-# =========================
+# ============================================================
 file(GLOB TEST_COMMON_SRC
     test/common/*.cu
 )
@@ -55,15 +71,14 @@ target_link_libraries(test_common
     CUDA::cudart
 )
 
-# =========================
+# ============================================================
 # 3️⃣ 自动为 test/cases 下每个 .cu 生成可执行文件
-# =========================
+# ============================================================
 file(GLOB TEST_CASES
     test/cases/*.cu
 )
 
 foreach(test_src ${TEST_CASES})
-    # 取文件名作为 executable 名
     get_filename_component(test_name ${test_src} NAME_WE)
 
     add_executable(${test_name}
@@ -71,7 +86,7 @@ foreach(test_src ${TEST_CASES})
     )
 
     target_link_libraries(${test_name}
-        cuSVD
+        cuSVD           # 已间接依赖 cuBlasEx
         test_common
         CUDA::cudart
         CUDA::cublas
