@@ -1,4 +1,4 @@
-#include <cuComplex.h>
+#include "host.cuh"
 
 double znrm2_host(int n, const cuDoubleComplex* x)
 {
