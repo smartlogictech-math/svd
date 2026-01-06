@@ -1,5 +1,4 @@
-#include <cuda_runtime.h>
-#include <cublas_v2.h>
+#include "cuSVD.cuh"
 
 /**
 *  ZLARFG generates a complex elementary reflector H of order n, such
