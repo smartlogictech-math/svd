@@ -39,13 +39,13 @@ void zlarf1f_gpu(
 
         // 2️⃣ work += C[1:m,:]^H * v_2
         cublasZgemv(handle, CUBLAS_OP_C, m - 1, n,
-                    &one, d_C + 1, ldc, d_v + 1, incv, &one, d_work, 1);
+                    &one, d_C + 1, ldc, d_v + incv, incv, &one, d_work, 1);
 
         // 3️⃣ C(1,:) -= tau * conj(work)
         zaxpyc(n, minus_tau, d_work, 1, d_C, ldc, stream);
 
         // 4️⃣ C(2:m,:) -= tau * v_2 * work^H
-        cublasZgerc(handle, m - 1, n, &minus_tau, d_v + 1, incv, d_work, 1, d_C + 1, ldc);
+        cublasZgerc(handle, m - 1, n, &minus_tau, d_v + incv, incv, d_work, 1, d_C + 1, ldc);
 
     } else if (side == 'R' || side == 'r') {
         // -------------------- Right multiply C * H --------------------
@@ -57,7 +57,7 @@ void zlarf1f_gpu(
 
         // 1️⃣ work = C[:,2:n] * v_2
         cublasZgemv(handle, CUBLAS_OP_N, m, n-1,
-                    &one, d_C + ldc, ldc, d_v + 1, incv, &zero, d_work, 1);
+                    &one, d_C + ldc, ldc, d_v + incv, incv, &zero, d_work, 1);
 
         // 2️⃣ work += C[:,1]  (v[0] contribution)
         cublasZaxpy(handle, m, &one, d_C, 1, d_work, 1);
@@ -66,7 +66,7 @@ void zlarf1f_gpu(
         cublasZaxpy(handle, m, &minus_tau, d_work, 1, d_C, 1);
 
         // 4️⃣ C[:,2:n] -= tau * work * v_2^H
-        cublasZgerc(handle, m, n-1, &minus_tau, d_work, 1, d_v + 1, incv, d_C + ldc, ldc);
+        cublasZgerc(handle, m, n-1, &minus_tau, d_work, 1, d_v + incv, incv, d_C + ldc, ldc);
 
     } else {
         fprintf(stderr, "[zlarf1f_gpu] Error: side must be 'L' or 'R'\n");
