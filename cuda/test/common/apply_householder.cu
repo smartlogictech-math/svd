@@ -2,6 +2,79 @@
 
 #include <stdio.h>
 
+void zlarfg_host(
+    int n,
+    cuDoubleComplex* alpha,       // v[0], in/out
+    cuDoubleComplex* x,           // v[1:], length n-1, in/out
+    int incx,
+    cuDoubleComplex* tau          // output
+)
+{
+    if (n <= 1) {
+        *tau = make_cuDoubleComplex(0.0, 0.0);
+        return;
+    }
+
+    //------------------------------------------------------------------
+    // Compute xnorm = ||x|| (host version of cublasDznrm2)
+    //------------------------------------------------------------------
+    double xnorm = 0.0;
+    for (int i = 0; i < n - 1; ++i) {
+        cuDoubleComplex xi = x[i * incx];
+        xnorm = hypot(xnorm, cuCabs(xi));
+    }
+
+    //------------------------------------------------------------------
+    // Fetch alpha
+    //------------------------------------------------------------------
+    cuDoubleComplex a = *alpha;
+
+    cuDoubleComplex beta, tau_val;
+
+    //------------------------------------------------------------------
+    // Case: reflector = I
+    //------------------------------------------------------------------
+    if (xnorm == 0.0 && cuCimag(a) == 0.0) {
+        tau_val = make_cuDoubleComplex(0.0, 0.0);
+        beta = a;
+    } 
+    //------------------------------------------------------------------
+    // General case: construct Householder reflector
+    //------------------------------------------------------------------
+    else {
+        double a_abs = cuCabs(a);
+
+        // beta = - sign(real(a)) * sqrt(|a|^2 + ||x||^2)
+        double beta_real = -copysign(
+            hypot(a_abs, xnorm),
+            cuCreal(a)
+        );
+        beta = make_cuDoubleComplex(beta_real, 0.0);
+
+        // tau = (beta - alpha) / beta
+        tau_val = cuCdiv(
+            cuCsub(beta, a),
+            beta
+        );
+
+        // scale = 1 / (alpha - beta)
+        cuDoubleComplex denom = cuCsub(a, beta);
+        cuDoubleComplex scale =
+            cuCdiv(make_cuDoubleComplex(1.0, 0.0), denom);
+
+        // scale x
+        for (int i = 0; i < n - 1; ++i) {
+            x[i * incx] = cuCmul(x[i * incx], scale);
+        }
+    }
+
+    //------------------------------------------------------------------
+    // Write results back
+    //------------------------------------------------------------------
+    *alpha = beta;
+    *tau   = tau_val;
+}
+
 void zlarfv_host(
     int n,
     cuDoubleComplex tau,
