@@ -3,7 +3,65 @@
 
 #if defined(__cplusplus)
 extern "C" {
-#endif /* __cplusplus */
+#endif
+
+/******************************************************************************
+ * 1. Scaling
+ *    修改矩阵 A，使其范数在合理范围内： A = A / scale
+ ******************************************************************************/
+/**
+ * @brief Compute the maximum absolute value (entry-wise max norm)
+ *        of a complex matrix A stored on the GPU.
+ *
+ * This routine finds the maximum value of |A[i,j]| over all matrix entries.
+ * For a complex number z = x + i*y, the absolute value is sqrt(x*x + y*y).
+ *
+ * The matrix A is on the GPU. The kernel scans all elements, performs
+ * parallel reduction, and stores the resulting maximum absolute value
+ * into the host pointer hMaxabs. A device workspace buffer "work" is used
+ * for partial reductions.
+ *
+ * @param[in] m
+ *      Number of rows of matrix A. Must be m >= 0.
+ *
+ * @param[in] n
+ *      Number of columns of matrix A. Must be n >= 0.
+ *
+ * @param[in] dA
+ *      Pointer to device memory containing matrix A (column-major).
+ *      Must store at least lda * n elements of type cuDoubleComplex.
+ *
+ * @param[in] lda
+ *      Leading dimension of A. Must satisfy lda >= max(1, m).
+ *
+ * @param[out] hMaxabs
+ *      Pointer to host memory where the resulting maximum absolute value
+ *      will be written. The function writes one double value.
+ *
+ * @param[in,out] dwork
+ *      Device workspace used for partial reductions.
+ *      Size requirements depend on implementation (typically several
+ *      blocks of temporary maxima).
+ *
+ * @param[in] stream
+ *      CUDA stream where the kernels will be launched.
+ *
+ * @return
+ *      - CUDA_SUCCESS on success
+ *      - CUDA error code if any GPU operation fails
+ *
+ * @note
+ * - This function is commonly used in SVD/QR algorithms to determine
+ *   a scaling factor for numerical stability.
+ * - The final result is copied asynchronously to hMaxabs using the given stream.
+ * - work is used only on the device; hMaxabs must be host-accessible.
+ */
+void zlange_maxabs_gpu(
+    int m, int n,
+    const cuDoubleComplex* dA, int lda,
+    double *hMaxabs,
+    double *dwork,
+    cudaStream_t stream);
 
 void zlacgv_gpu(int n, cuDoubleComplex* d_x, int incx, cudaStream_t stream);
 
