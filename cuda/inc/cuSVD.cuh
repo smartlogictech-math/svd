@@ -62,6 +62,55 @@ void zlange_maxabs_gpu(
     double *hMaxabs,
     double *dwork,
     cudaStream_t stream);
+/**
+ * @brief Scale a dense complex matrix A on GPU:  A = (*dScale) * A.
+ *
+ * This routine multiplies every entry of an m-by-n complex matrix A by the
+ * scalar value stored in device memory at `dScale`.  The matrix A must be
+ * stored in column-major layout with leading dimension `lda`.
+ *
+ * This is a simplified GPU version of LAPACK's ZLASCL.  Only general dense
+ * matrices are supported and the routine performs a single scaling pass
+ * without overflow/underflow protection.
+ *
+ * Differences from LAPACK ZLASCL:
+ * - Only general full matrices are supported (TYPE = 'G').
+ * - No CFROM/CTO multi-step scaling; uses only a single scalar *dScale.
+ * - No band, triangular, Hessenberg, or special structured matrix support.
+ * - Does not handle safe scaling to avoid overflow or underflow.
+ *
+ * Typical usage:
+ * 1. Compute max absolute value of A.
+ * 2. Write (1.0 / maxabs) to a device pointer `dScale`.
+ * 3. Call this routine to normalize A on the GPU.
+ *
+ * @param[in] m
+ *     Number of rows of A.
+ *
+ * @param[in] n
+ *     Number of columns of A.
+ *
+ * @param[in] dScale
+ *     Device pointer to a single double value holding the scale factor.
+ *     Each A(i,j) becomes (*dScale) * A(i,j).
+ *
+ * @param[in,out] dA
+ *     Device pointer to an m-by-n complex matrix stored in column-major
+ *     format with leading dimension `lda`.
+ *
+ * @param[in] lda
+ *     Leading dimension of A. Must satisfy lda >= max(1, m).
+ *
+ * @param[in] stream
+ *     CUDA stream in which the scaling kernel will be launched.
+ *
+ * @return void
+ */
+void zlascl_gpu(
+    int m, int n,
+    const double* dScale,
+    cuDoubleComplex* dA, int lda,
+    cudaStream_t stream);
 
 void zlacgv_gpu(int n, cuDoubleComplex* d_x, int incx, cudaStream_t stream);
 
