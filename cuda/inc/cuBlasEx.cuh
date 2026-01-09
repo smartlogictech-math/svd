@@ -8,7 +8,7 @@ extern "C" {
 
 void zaxpyc(
     int n,
-    cuDoubleComplex alpha,
+    const cuDoubleComplex *alpha,
     const cuDoubleComplex* x, int incx,
     cuDoubleComplex* y, int incy,
     cudaStream_t stream

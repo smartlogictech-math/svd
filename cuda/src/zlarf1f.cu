@@ -15,9 +15,10 @@ void zlarf1f_gpu(
     if (cuCreal(tau) == 0.0 && cuCimag(tau) == 0.0) return;
     if (m <= 0 || n <= 0) return;
 
+    /// @attention 这里one zero minus_tau在host上，接口为device指针时，需申请device内存copy过去
     const cuDoubleComplex one = make_cuDoubleComplex(1.0, 0.0);
     const cuDoubleComplex zero = make_cuDoubleComplex(0.0, 0.0);
-    cuDoubleComplex minus_tau = make_cuDoubleComplex(-tau.x, -tau.y);
+    const cuDoubleComplex minus_tau = make_cuDoubleComplex(-tau.x, -tau.y);
 
     // -------------------- 获取 handle 当前流 --------------------
     cudaStream_t stream;
@@ -42,7 +43,7 @@ void zlarf1f_gpu(
                     &one, d_C + 1, ldc, d_v + incv, incv, &one, d_work, 1);
 
         // 3️⃣ C(1,:) -= tau * conj(work)
-        zaxpyc(n, minus_tau, d_work, 1, d_C, ldc, stream);
+        zaxpyc(n, &minus_tau, d_work, 1, d_C, ldc, stream);
 
         // 4️⃣ C(2:m,:) -= tau * v_2 * work^H
         cublasZgerc(handle, m - 1, n, &minus_tau, d_v + incv, incv, d_work, 1, d_C + 1, ldc);
