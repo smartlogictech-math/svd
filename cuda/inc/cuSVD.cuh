@@ -125,7 +125,7 @@ void zlarfg_gpu(
     cuDoubleComplex *d_alpha,
     cuDoubleComplex *d_x,
     int incx,
-    cuDoubleComplex *d_tau);
+    cuDoubleComplex *h_tau);
 
 enum HouseholderSide {
     HOUSEHOLDER_LEFT,

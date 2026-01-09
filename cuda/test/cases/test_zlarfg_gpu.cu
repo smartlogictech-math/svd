@@ -60,10 +60,9 @@ void test_zlarfg_gpu(int n)
     }
 
     // ---------- device data ----------
-    cuDoubleComplex *d_alpha, *d_x, *d_tau;
+    cuDoubleComplex *d_alpha, *d_x;
     cudaMalloc(&d_alpha, sizeof(*d_alpha));
     cudaMalloc(&d_x,     (n-1) * sizeof(*d_x));
-    cudaMalloc(&d_tau,   sizeof(*d_tau));
 
     cudaMemcpy(d_alpha, &h_y[0], sizeof(*d_alpha), cudaMemcpyHostToDevice);
     cudaMemcpy(d_x,     &h_y[1], (n-1)*sizeof(*d_x), cudaMemcpyHostToDevice);
@@ -71,13 +70,12 @@ void test_zlarfg_gpu(int n)
     // ---------- call under test ----------
     cublasHandle_t handle;
     cublasCreate(&handle);
-
-    zlarfg_gpu(handle, n, d_alpha, d_x, 1, d_tau);
+    cuDoubleComplex tau;
+    zlarfg_gpu(handle, n, d_alpha, d_x, 1, &tau);
 
     // ---------- copy back ----------
-    cuDoubleComplex beta, tau;
+    cuDoubleComplex beta;
     cudaMemcpy(&beta, d_alpha, sizeof(beta), cudaMemcpyDeviceToHost);
-    cudaMemcpy(&tau,  d_tau,   sizeof(tau),  cudaMemcpyDeviceToHost);
     cudaMemcpy(&h_v[1], d_x, (n-1)*sizeof(*d_x), cudaMemcpyDeviceToHost);
 
     h_v[0] = make_cuDoubleComplex(1.0, 0.0);
@@ -91,7 +89,6 @@ void test_zlarfg_gpu(int n)
 
     cudaFree(d_alpha);
     cudaFree(d_x);
-    cudaFree(d_tau);
     cublasDestroy(handle);
 }
 

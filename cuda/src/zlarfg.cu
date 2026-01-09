@@ -28,12 +28,11 @@ void zlarfg_gpu(
     cuDoubleComplex* d_alpha,
     cuDoubleComplex* d_x,
     int incx,
-    cuDoubleComplex* d_tau
+    cuDoubleComplex* h_tau
 )
 {
     if (n <= 1) {
-        cuDoubleComplex zero = make_cuDoubleComplex(0.0, 0.0);
-        cudaMemcpy(d_tau, &zero, sizeof(zero), cudaMemcpyHostToDevice);
+        *h_tau = make_cuDoubleComplex(0.0, 0.0);
         return;
     }
 
@@ -69,5 +68,5 @@ void zlarfg_gpu(
     }
 
     cudaMemcpy(d_alpha, &beta, sizeof(beta), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_tau,   &tau,  sizeof(tau),  cudaMemcpyHostToDevice);
+    *h_tau = tau;
 }
