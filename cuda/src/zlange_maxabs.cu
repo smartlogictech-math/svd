@@ -4,13 +4,13 @@ void blasDamax(
     cudaStream_t stream,
     int n,
     const double *dx, int incx,
-    double *dret);
+    double *dret){}
 
 void blasZamax(
     cudaStream_t stream,
     int n,
     const cuDoubleComplex *dx, int incx,
-    double *dret);
+    double *dret){}
 
 /**
  * @brief Compute max absolute value of a complex matrix on GPU.
