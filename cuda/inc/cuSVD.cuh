@@ -1,4 +1,4 @@
-#pragma once 
+#pragma once
 #include "cublas_v2.h"
 
 #if defined(__cplusplus)
@@ -112,6 +112,11 @@ void zlascl_gpu(
     cuDoubleComplex* dA, int lda,
     cudaStream_t stream);
 
+
+/******************************************************************************
+ * 2. Householder 基本操作：zlarfg / zlarf / zlarf1f / zlacgv
+ ******************************************************************************/
+
 void zlacgv_gpu(int n, cuDoubleComplex* d_x, int incx, cudaStream_t stream);
 
 void zlarfg_gpu(
@@ -161,6 +166,20 @@ void zlarf1f_gpu(
     cuDoubleComplex* d_C, int ldc,
     cuDoubleComplex* d_work
 );
+
+/******************************************************************************
+ * 3. Reduce to bidiagonal form: zgebd2 (unblocked)
+ ******************************************************************************/
+
+void zgebd2_gpu(
+    cublasHandle_t handle,
+    int m, int n,
+    cuDoubleComplex* dA, int lda,
+    double* hD,
+    double* hE,
+    cuDoubleComplex* hTauQ,
+    cuDoubleComplex* hTauP,
+    cuDoubleComplex* dwork); // device workspace (size >= max(m,n))
 
 #if defined(__cplusplus)
 }
