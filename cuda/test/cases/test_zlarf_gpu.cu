@@ -30,12 +30,11 @@ static void test_zlarf_left(int n)
     // =========================
     // Device data
     // =========================
-    cuDoubleComplex *d_alpha, *d_x, *d_tau;
+    cuDoubleComplex *d_alpha, *d_x;
     cuDoubleComplex *d_y, *d_v, *d_work;
 
     cudaMalloc(&d_alpha, sizeof(*d_alpha));
     cudaMalloc(&d_x, (n - 1) * sizeof(*d_x));
-    cudaMalloc(&d_tau, sizeof(*d_tau));
     cudaMalloc(&d_y, n * sizeof(*d_y));
     cudaMalloc(&d_v, n * sizeof(*d_v));
     cudaMalloc(&d_work, n * sizeof(*d_work));
@@ -52,11 +51,11 @@ static void test_zlarf_left(int n)
     // =========================
     // Generate Householder reflector
     // =========================
-    zlarfg_gpu(handle, n, d_alpha, d_x, 1, d_tau);
+    cuDoubleComplex tau;
+    zlarfg_gpu(handle, n, d_alpha, d_x, 1, &tau);
 
-    cuDoubleComplex beta, tau;
+    cuDoubleComplex beta;
     cudaMemcpy(&beta, d_alpha, sizeof(beta), cudaMemcpyDeviceToHost);
-    cudaMemcpy(&tau,  d_tau,   sizeof(tau),  cudaMemcpyDeviceToHost);
 
     // build v on host, then copy to device
     h_v[0] = make_cuDoubleComplex(1.0, 0.0);
@@ -149,7 +148,6 @@ static void test_zlarf_left(int n)
 
     cudaFree(d_alpha);
     cudaFree(d_x);
-    cudaFree(d_tau);
     cudaFree(d_y);
     cudaFree(d_v);
     cudaFree(d_work);
