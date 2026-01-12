@@ -42,11 +42,20 @@ void zlarf1f_gpu(
         cublasZgemv(handle, CUBLAS_OP_C, m - 1, n,
                     &one, d_C + 1, ldc, d_v + incv, incv, &one, d_work, 1);
 
+    #if 0
         // 3️⃣ C(1,:) -= tau * conj(work)
         zaxpyc(n, &minus_tau, d_work, 1, d_C, ldc, stream);
 
         // 4️⃣ C(2:m,:) -= tau * v_2 * work^H
         cublasZgerc(handle, m - 1, n, &minus_tau, d_v + incv, incv, d_work, 1, d_C + 1, ldc);
+    #else
+        /// 先使用d_work后，再去取共轭修改
+        // 3️⃣ C(2:m,:) -= tau * v_2 * work^H
+        cublasZgerc(handle, m - 1, n, &minus_tau, d_v + incv, incv, d_work, 1, d_C + 1, ldc);
+        // 4️⃣ C(1,:) -= tau * conj(work)
+        zlacgv_gpu(n, d_work, 1, stream);
+        cublasZaxpy(handle, n, &minus_tau, d_work, 1, d_C, ldc);
+    #endif
 
     } else if (side == 'R' || side == 'r') {
         // -------------------- Right multiply C * H --------------------
