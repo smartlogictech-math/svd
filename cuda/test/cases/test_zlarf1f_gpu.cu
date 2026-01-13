@@ -214,6 +214,56 @@ void test_incv_gt_1(cublasHandle_t handle)
     cudaFree(d_w);
 }
 
+static void print_complex(const cuDoubleComplex& z) {
+    printf("(%+.20e,%+.20e)", cuCreal(z), cuCimag(z));
+}
+
+static void test_left_2x1(cublasHandle_t handle){
+    printf("\n===== Test zlarf1f: m=2, n=1 =====\n");
+
+    const int m = 2, n = 1, lda = 2;
+
+    // v = [1, 0.5+0.2i]
+    cuDoubleComplex h_v[2] = {
+        make_cuDoubleComplex(1.0, 0.0),
+        make_cuDoubleComplex(8.38033788781084587605e-01, -1.18611023298168707929e-01)
+    };
+
+    // A = column vector 
+    cuDoubleComplex h_A[2] = {
+        make_cuDoubleComplex(-7.55031932294247809523e-02, 1.21652212713177845793e-03),
+        make_cuDoubleComplex(-4.33788350865042970916e-01, 1.13704831137971043575e-01)
+    };
+
+    cuDoubleComplex tau = make_cuDoubleComplex(+1.16493251422069121759e+00,+1.92452788207769960593e-02);
+
+    // Device memory
+    cuDoubleComplex *d_v, *d_A, *d_work;
+    cudaMalloc((void**)&d_v, m * sizeof(cuDoubleComplex));
+    cudaMalloc((void**)&d_A, m * sizeof(cuDoubleComplex));
+    cudaMalloc((void**)&d_work, m * sizeof(cuDoubleComplex));
+
+    cudaMemcpy(d_v, h_v, m * sizeof(cuDoubleComplex), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_A, h_A, m * sizeof(cuDoubleComplex), cudaMemcpyHostToDevice);
+
+    
+    // --- Call your kernel ---
+    zlarf1f_gpu(handle, 'L', m, n, d_v, 1, cuConj(tau), d_A, lda,d_work );
+
+    // Get result
+    cuDoubleComplex h_A_ref[2];
+    cudaMemcpy(h_A_ref, d_A, m * sizeof(cuDoubleComplex), cudaMemcpyDeviceToHost);
+
+    // Print output
+    printf("Result A = H*A:\n");
+    printf("  row0: "); print_complex(h_A_ref[0]); printf("\n");
+    printf("  row1: "); print_complex(h_A_ref[1]); printf("\n");
+
+    cudaFree(d_v);
+    cudaFree(d_A);
+    cudaFree(d_work);
+}
+
 int main()
 {
     cublasHandle_t handle;
@@ -225,7 +275,7 @@ int main()
     test_large_random(handle, 'R');
     test_tau_zero(handle);
     test_incv_gt_1(handle);
-
+    // test_left_2x1(handle);
     cublasDestroy(handle);
     printf("All zlarf1f tests PASSED.\n");
     return 0;
