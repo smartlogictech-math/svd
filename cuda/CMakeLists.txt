@@ -90,6 +90,7 @@ foreach(test_src ${TEST_CASES})
         test_common
         CUDA::cudart
         CUDA::cublas
+        CUDA::cusolver
     )
 
     target_compile_options(${test_name} PRIVATE
