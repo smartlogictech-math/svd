@@ -8,6 +8,27 @@ extern "C" {
 #endif
 
 cusolverStatus_t
+solverDnZgebrd_bufferSize(
+    cusolverDnHandle_t handle,
+    int m,
+    int n,
+    int *Lwork );
+
+cusolverStatus_t
+solverDnZgebrd(cusolverDnHandle_t handle,
+           int m,
+           int n,
+           cuDoubleComplex *A,
+           int lda,
+           double *D,
+           double *E,
+           cuDoubleComplex *TAUQ,
+           cuDoubleComplex *TAUP,
+           cuDoubleComplex *Work,
+           int Lwork,
+           int *devInfo );
+
+cusolverStatus_t
 solverDnZgesvd_bufferSize(
     cusolverDnHandle_t handle,
     int m,
