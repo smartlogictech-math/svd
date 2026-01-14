@@ -1,10 +1,12 @@
+#include "cuSVD.cuh"
+
 #include <iostream>
 #include <vector>
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
 #include <cusolverDn.h>
 #include <cmath>
-#include "cuSVD.cuh"
+#include <assert.h>
 
 using cuDoubleComplex = cuDoubleComplex;
 
@@ -215,8 +217,6 @@ void test_zgebd2(MatrixType type, int m, int n)
 
     CHECK_CUDA(cudaMalloc((void**)&d_A_my, sizeof(cuDoubleComplex) * m * n));
     CHECK_CUDA(cudaMalloc((void**)&d_work,  sizeof(cuDoubleComplex) * std::max(m, n)));
-    cuDoubleComplex *h_A_data = h_A.data();
-    printf("h_A_data=%p\n", h_A_data);
 
     h2d(d_A_my, h_A);  // upload input matrix
 
@@ -319,20 +319,53 @@ void test_zgebd2(MatrixType type, int m, int n)
     // 5. Print summary
     // =====================================================================
     const char* type_str =
-        (type == MatrixType::HAND_UPPER ? "HAND_UPPER" :
-         type == MatrixType::HAND_LOWER ? "HAND_LOWER" : "RANDOM");
+    (type == MatrixType::HAND_UPPER ? "HAND_UPPER" :
+     type == MatrixType::HAND_LOWER ? "HAND_LOWER" : "RANDOM");
 
+    // ---- 计算误差 ----
+    double errD   = max_rel_error_robust(h_D_ref, h_D_my);
+    double errE   = max_rel_error_robust(h_E_ref, h_E_my);
+    double errTauQ = max_rel_error_cu_robust(h_TauQ_ref, h_TauQ_my);
+    double errTauP = max_rel_error_cu_robust(h_TauP_ref, h_TauP_my);
+
+    // ---- 打印测试信息 ----
     std::cout << "Test " << type_str << "  " << m << "x" << n
-              << " | D err = "    << max_rel_error_robust(h_D_ref,    h_D_my)
-              << " | E err = "    << max_rel_error_robust(h_E_ref,    h_E_my)
-              << " | TauQ err = " << max_rel_error_cu_robust(h_TauQ_ref, h_TauQ_my)
-              << " | TauP err = " << max_rel_error_cu_robust(h_TauP_ref, h_TauP_my)
-              << std::endl;
+            << " | D err = "    << errD
+            << " | E err = "    << errE
+            << " | TauQ err = " << errTauQ
+            << " | TauP err = " << errTauP
+            << std::endl;
+
+    // ======================================================
+    //  根据 D/E 进行断言：
+    //  * 容许阈值可自己调整，例如 1e-12 或 5e-13
+    //  * TauQ/TauP 不参与最终正确性判断
+    // ======================================================
+    const double D_tol = 1e-12;
+    const double E_tol = 1e-12;
+
+    if (errD > D_tol || errE > E_tol) {
+        std::cerr << "❌ Bidiagonal D/E mismatch exceeds tolerance!\n";
+        std::cerr << "    errD = " << errD << " (tol=" << D_tol << ")\n";
+        std::cerr << "    errE = " << errE << " (tol=" << E_tol << ")\n";
+
+        // 如果希望失败时自动打印详细对比，可启用：
+        print_bidiag_compare(
+            m, n, /* idx */ -1,
+            h_D_ref,    h_D_my,
+            h_E_ref,    h_E_my,
+            h_TauQ_ref, h_TauQ_my,
+            h_TauP_ref, h_TauP_my,
+            hA_ref,     hA_my
+        );
+
+        assert(false && "D/E check failed");
+    }
 
     // =====================================================================
     // 6. Detailed dump: call your print_bidiag_compare
     // =====================================================================
-#if 1
+#if 0
     print_bidiag_compare(
         m, n, /* idx */ -1,
         h_D_ref,    h_D_my,
