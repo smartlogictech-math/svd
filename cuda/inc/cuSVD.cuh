@@ -1,5 +1,6 @@
 #pragma once
 #include "cublas_v2.h"
+#include "cusolverDn.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -116,9 +117,62 @@ void zlascl_gpu(
 /******************************************************************************
  * 2. Householder 基本操作：zlarfg / zlarf / zlarf1f / zlacgv
  ******************************************************************************/
-
 void zlacgv_gpu(int n, cuDoubleComplex* d_x, int incx, cudaStream_t stream);
-
+/**
+ * @brief Generate a complex Householder reflector (GPU version).
+ *
+ * This function constructs a Householder reflector H of order n such that:
+ *
+ *     H * [ alpha ; x ] = [ beta ; 0 ]
+ *
+ * where:
+ *   - alpha is a complex scalar stored on the device (d_alpha)
+ *   - x is a complex vector stored on the device (d_x)
+ *   - beta is a real scalar (returned through d_alpha)
+ *   - tau is returned on the host (h_tau)
+ *
+ * The reflector has the standard form:
+ *
+ *     H = I - tau * [ 1 ; v ] * [ 1 ; v ]^H
+ *
+ * After the call:
+ *   - d_alpha contains beta
+ *   - d_x contains the vector v
+ *   - h_tau contains tau (host memory)
+ *
+ * This is the GPU equivalent of LAPACK's ZLARFG. The algorithm uses:
+ *   - cublasDznrm2 to compute the 2-norm of x
+ *   - cublasZscal to scale x
+ *
+ * Parameters
+ * ----------
+ *
+ * @param[in] handle
+ *     cuBLAS handle used for BLAS operations.
+ *
+ * @param[in] n
+ *     Order of the reflector. If n <= 1, the reflector is trivial and tau = 0.
+ *
+ * @param[in,out] d_alpha
+ *     Device pointer to the scalar alpha.
+ *     On exit, overwritten by beta.
+ *
+ * @param[in,out] d_x
+ *     Device pointer to the vector x of length n-1.
+ *     On exit, overwritten by the Householder vector v.
+ *
+ * @param[in] incx
+ *     Stride between elements of d_x.
+ *
+ * @param[out] h_tau
+ *     Host pointer where the scalar tau is stored.
+ *
+ * Notes
+ * -----
+ * - Only alpha and x reside on the device. tau is returned on the host.
+ * - Device-to-host and host-to-device copies are performed inside this routine.
+ * - Behavior matches LAPACK ZLARFG, except this version operates on GPU memory.
+ */
 void zlarfg_gpu(
     cublasHandle_t handle,
     int n,
@@ -131,7 +185,66 @@ enum HouseholderSide {
     HOUSEHOLDER_LEFT,
     HOUSEHOLDER_RIGHT
 };
-
+/**
+ * @brief Apply a complex Householder reflector to a matrix on GPU.
+ *
+ * This routine applies a Householder transformation
+ *     H = I - tau * v * v^H
+ * to a device matrix C.
+ *
+ * Depending on @p side:
+ *   - HOUSEHOLDER_LEFT  : C = H * C
+ *   - HOUSEHOLDER_RIGHT : C = C * H
+ *
+ * The operation uses the following steps:
+ *   1. Compute w = v^H * C   (left case)  or  w = C * v  (right case)
+ *   2. Update C = C - tau * v * w^H      (left case)
+ *      or     C = C - tau * w * v^H      (right case)
+ *
+ * No computation is performed if @p tau is 0.
+ *
+ * @param[in] handle
+ *     cuBLAS context handle.
+ *
+ * @param[in] side
+ *     Specifies whether the reflector H is applied from the left
+ *     (HOUSEHOLDER_LEFT) or right (HOUSEHOLDER_RIGHT).
+ *
+ * @param[in] m
+ *     Number of rows of matrix C.
+ *
+ * @param[in] n
+ *     Number of columns of matrix C.
+ *
+ * @param[in] d_v
+ *     Pointer to the Householder vector v in device memory.
+ *
+ * @param[in] incv
+ *     Increment between elements of vector v.
+ *
+ * @param[in] tau
+ *     The Householder scalar.  
+ *     If tau == 0, the function exits immediately since H = I.
+ *
+ * @param[in,out] d_C
+ *     On entry: the matrix C stored in device memory.  
+ *     On exit:  the updated matrix after applying the reflector.
+ *
+ * @param[in] ldc
+ *     Leading dimension of matrix C.
+ *
+ * @param[in,out] d_work
+ *     Workspace vector in device memory.  
+ *     Required size:  
+ *       - at least n elements when applying from LEFT  
+ *       - at least m elements when applying from RIGHT
+ *
+ * @note This routine is the GPU equivalent of LAPACK's ZLARF.
+ * @note d_v, d_C, and d_work must reside in GPU device memory.
+ * @note d_work must not overlap with d_v or d_C.
+ *
+ * @return None.
+ */
 void zlarf_gpu(
     cublasHandle_t handle,
     HouseholderSide side,
@@ -141,7 +254,6 @@ void zlarf_gpu(
     cuDoubleComplex* d_C, int ldc,
     cuDoubleComplex* d_work
 );
-
 /**
  * @brief Apply Householder reflector H = I - tau * v v^H to matrix C
  *        v[0] is implicit 1, v[1..] are stored in d_v[1..]
@@ -171,8 +283,84 @@ void zlarf1f_gpu(
  * 3. Reduce to bidiagonal form: zgebd2 (unblocked)
  ******************************************************************************/
 
+/**
+ * @brief Unblocked bidiagonal reduction of a complex matrix A on the GPU.
+ *
+ * This routine reduces a complex m-by-n matrix A to real bidiagonal form B
+ * using Householder reflectors:
+ *
+ *     A = Q * B * P^H
+ *
+ * where:
+ *   - Q is an m-by-m unitary matrix represented by Householder vectors in A
+ *   - P is an n-by-n unitary matrix represented by Householder vectors in A
+ *   - B is bidiagonal with diagonal D and off-diagonal E
+ *
+ * This is the GPU analogue of the LAPACK ZGEBD2 routine, performing an
+ * **unblocked** bidiagonal reduction. It is mainly used for correctness
+ * or small-size SVD, not for performance. For high performance, the
+ * blocked algorithm (ZGEHRD/ZGEBRD) should normally be used.
+ *
+ * Input matrix A is overwritten with Householder vectors for Q and P:
+ *   - The reflector vectors for Q are stored below the diagonal of A.
+ *   - The reflector vectors for P^H are stored above the superdiagonal of A.
+ *
+ * The scalars tauQ and tauP contain the coefficients of the Householder
+ * reflectors defining Q and P^H.
+ *
+ * @param[in] handle
+ *     cuSolver handle
+ *
+ * @param[in] m
+ *     Number of rows of matrix A.
+ *
+ * @param[in] n
+ *     Number of columns of matrix A.
+ *
+ * @param[in,out] dA
+ *     Device pointer to matrix A in column-major layout (lda-by-n).
+ *     On exit, overwritten by:
+ *       - The diagonal of the bidiagonal matrix is stored separately in hD.
+ *       - The superdiagonal/subdiagonal is stored in hE.
+ *       - The Householder vectors for Q and P^H are stored in the strictly
+ *         lower and upper triangle of A respectively.
+ *
+ * @param[in] lda
+ *     Leading dimension of A. Must satisfy:
+ *         lda >= max(1, m)
+ *
+ * @param[out] hD
+ *     Host pointer to an array of length k = min(m, n).
+ *     On exit, hD[i] contains the i-th diagonal element of the bidiagonal matrix.
+ *
+ * @param[out] hE
+ *     Host pointer to an array of length k = min(m, n)-1.
+ *     On exit, hE[i] contains the i-th superdiagonal/subdiagonal element of B.
+ *
+ * @param[out] hTauQ
+ *     Host pointer to an array of length k = min(m, n).
+ *     Contains scalars of the Householder reflectors for left unitary matrix Q.
+ *
+ * @param[out] hTauP
+ *     Host pointer to an array of length k = min(m, n).
+ *     Contains scalars of the Householder reflectors for right unitary matrix P^H.
+ *
+ * @param[in,out] dwork
+ *     Device workspace buffer.
+ *     Must have size >= max(m, n).
+ *     Used as temporary vector for internal GEMV computations.
+ *
+ * @note
+ *   - All GPU operations use cuBLAS; all tau/D/E arrays are stored on host.
+ *   - This is a low-performance unblocked algorithm; suitable mainly for
+ *     small matrices or debugging correctness.
+ *   - The matrix A, hTauQ, and hTauP together encode Q and P^H implicitly.
+ *
+ * @return
+ *     Nothing. Results are written into dA, hD, hE, hTauQ, and hTauP.
+ */
 void zgebd2_gpu(
-    cublasHandle_t handle,
+    cusolverDnHandle_t handle,
     int m, int n,
     cuDoubleComplex* dA, int lda,
     double* hD,

@@ -223,12 +223,12 @@ void test_zgebd2(MatrixType type, int m, int n)
     std::vector<double>          h_D_my(min_mn), h_E_my(min_mn - 1);
     std::vector<cuDoubleComplex> h_TauQ_my(min_mn), h_TauP_my(min_mn);
 
-    cublasHandle_t cublasHandle;
-    CHECK_CUBLAS(cublasCreate(&cublasHandle));
+    cusolverDnHandle_t handle;
+    CHECK_CUSOLVER(cusolverDnCreate(&handle));
 
     // ---- run our implementation ----
     zgebd2_gpu(
-        cublasHandle,
+        handle,
         m, n,
         d_A_my, lda,
         h_D_my.data(), h_E_my.data(),
@@ -356,7 +356,7 @@ void test_zgebd2(MatrixType type, int m, int n)
     CHECK_CUDA(cudaFree(d_work_ref));
     CHECK_CUDA(cudaFree(d_info));
 
-    CHECK_CUBLAS(cublasDestroy(cublasHandle));
+    CHECK_CUSOLVER(cusolverDnDestroy(handle));
     CHECK_CUSOLVER(cusolverDnDestroy(cusolverHandle));
 }
 

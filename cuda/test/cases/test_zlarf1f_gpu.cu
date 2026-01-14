@@ -214,10 +214,10 @@ void test_incv_gt_1(cublasHandle_t handle)
     cudaFree(d_w);
 }
 
+# if 0
 static void print_complex(const cuDoubleComplex& z) {
     printf("(%+.20e,%+.20e)", cuCreal(z), cuCimag(z));
 }
-
 static void test_left_2x1(cublasHandle_t handle){
     printf("\n===== Test zlarf1f: m=2, n=1 =====\n");
 
@@ -263,7 +263,7 @@ static void test_left_2x1(cublasHandle_t handle){
     cudaFree(d_A);
     cudaFree(d_work);
 }
-
+#endif
 int main()
 {
     cublasHandle_t handle;

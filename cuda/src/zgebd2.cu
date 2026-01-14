@@ -1,7 +1,7 @@
 #include "cuSVD.cuh"
 
 void zgebd2_gpu(
-    cublasHandle_t      handle,
+    cusolverDnHandle_t  handle,
     int                 m,
     int                 n,
     cuDoubleComplex*    d_A,        // device matrix A
@@ -14,7 +14,11 @@ void zgebd2_gpu(
 )
 {
     cudaStream_t stream;
-    cublasGetStream(handle, &stream);
+    cusolverDnGetStream(handle, &stream);
+
+    cublasHandle_t blasHandle;
+    cublasCreate(&blasHandle);
+    cublasSetStream(blasHandle, stream);
 
     // ============================================================
     //  Case 1: m >= n  —— Reduce to upper bidiagonal
@@ -33,7 +37,7 @@ void zgebd2_gpu(
             cuDoubleComplex* d_Aii   = d_A + ii + ii * lda;       // A(ii,ii)
             cuDoubleComplex* d_Acol  = d_A + (ii+1) + ii * lda;   // A(ii+1:m,ii)
             zlarfg_gpu(
-                handle,
+                blasHandle,
                 rows,
                 d_Aii,
                 d_Acol,
@@ -52,7 +56,7 @@ void zgebd2_gpu(
             {
                 cuDoubleComplex* d_Aright = d_A + ii + (ii+1) * lda;
                 zlarf1f_gpu(
-                    handle,
+                    blasHandle,
                     'L',
                     rows,
                     cols,
@@ -80,7 +84,7 @@ void zgebd2_gpu(
                 cudaStreamSynchronize(stream);
 
                 zlarfg_gpu(
-                    handle,
+                    blasHandle,
                     cols,
                     d_Ai_ip1,
                     d_Ai_ip2,
@@ -101,7 +105,7 @@ void zgebd2_gpu(
                     cuDoubleComplex* d_Asub = d_A + (ii+1) + (ii+1) * lda;
 
                     zlarf1f_gpu(
-                        handle,
+                        blasHandle,
                         'R',
                         rows2,
                         cols,
@@ -131,6 +135,8 @@ void zgebd2_gpu(
     // ============================================================
     else {
         /// 暂时对标cuSolver,不支持m<n
-        return;
     }
+
+    cublasDestroy(blasHandle);
+    return;
 }
